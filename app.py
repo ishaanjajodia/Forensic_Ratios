@@ -32,14 +32,17 @@ if ticker:
             st.table(beneish)
 
             
-            st.header("Piotroski F-Score")
-            fscore_results = calculate_piotroski_f_score(data)
-            # 👇 DEBUG: show what it's returning
-            st.subheader("🔍 Debug Output")
-            st.write(fscore_results)
-            for res in fscore_results:
-                 st.write("🔎 Type of result:", type(res))
-                 st.write("🔎 Value:", res)
+            fscore_results = calculate_piotroski_f_score(annuals)
+
+            st.subheader("📘 Piotroski F-Score")
+            st.table([
+            {
+              'Year': res['Year'],
+              'F-Score': res['F-Score'],
+              'Criteria': ', '.join(['✔️' if c else '❌' for c in res['Criteria']])
+               } for res in fscore_results
+                      ])
+
 
     except Exception as e:
         st.error(f"❌ Error: {str(e)}")
