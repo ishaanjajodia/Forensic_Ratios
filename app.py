@@ -28,16 +28,16 @@ if ticker:
         st.table(beneish)
 
 
-        st.header("Piotroski F-Score")
-        fscore_results = calculate_piotroski_score(data)
-        for row in fscore_results:
-            st.subheader(f"📅 Year: {row['Year']}")
-            st.write(f"**F-Score**: {row['F-Score']}/9")
-            if row['Criteria'] != ["Error"] * 9:
-                for i, passed in enumerate(row['Criteria'], 1):
-                    st.write(f"Criterion {i}: {'✅' if passed else '❌'}")
-            else:
-                st.warning("⚠️ Error computing criteria for this year.")
+with st.expander("Piotroski F-Score"):
+    piotroski = calculate_piotroski_score(data)
+    if isinstance(piotroski, dict) and 'error' in piotroski:
+        st.error("Piotroski Error: " + piotroski['error'])
+    else:
+        for row in piotroski:
+            st.markdown(f"**Year {row['Year']}** – F-Score: {row['F-Score']}/9")
+            for i, flag in enumerate(row['Criteria'], 1):
+                st.markdown(f"- Criterion {i}: {'✅' if flag else '❌'}")
+
 
 
     except Exception as e:
