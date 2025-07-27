@@ -43,7 +43,7 @@ if ticker:
                  'Year': res['Year'],
                  'F-Score': res['F-Score'],
                  'Criteria': '\n'.join([
-                        f"{i+1}. {name} — {'✔️' if flag else '❌'}"
+                        f"{i+1}. {name} — {'🟢' if flag else '❌'}"
                         for i, (name, flag) in enumerate(zip([
                                 "ROA > 0",
                                 "CFO > 0",
