@@ -1,6 +1,11 @@
 import streamlit as st
 from utils import fetch_data_from_indianapi
-from ratios import calculate_sloan_ratios, calculate_altman_z_scores, calculate_beneish_m_score
+from ratios import (
+    calculate_sloan_ratios,
+    calculate_altman_z_scores,
+    calculate_beneish_m_score,
+    calculate_piotroski_f_score
+)
 
 st.title("📊 Forensic Stock Analyzer")
 
@@ -25,6 +30,14 @@ if ticker:
             beneish = calculate_beneish_m_score(data)
             st.subheader("📙 Beneish M-Score (Earnings Manipulation Risk)")
             st.table(beneish)
+
+            st.header("Piotroski F-Score")
+            fscore_results = calculate_piotroski_f_score(data)
+            for res in fscore_results:
+                st.subheader(f"📒 Year: {res['Year']} | F-Score: {res['F-Score']}/9")
+                for i, crit in enumerate(res['Criteria'], 1):
+                    st.markdown(f"- Criterion {i}: {'✅ Yes' if crit else '❌ No'}")
+                st.markdown("")
 
     except Exception as e:
         st.error(f"❌ Error: {str(e)}")
