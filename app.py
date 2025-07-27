@@ -32,16 +32,20 @@ if ticker:
             st.table(beneish)
 
             
-            fscore_results = calculate_piotroski_f_score(data)
+annuals = [x for x in data['financials'] if x['Type'] == 'Annual']
+    annuals = sorted(annuals, key=lambda x: int(x['FiscalYear']))
 
-            st.subheader("📘 Piotroski F-Score")
-            st.table([
-            {
-              'Year': res['Year'],
-              'F-Score': res['F-Score'],
-              'Criteria': ', '.join(['✔️' if c else '❌' for c in res['Criteria']])
-               } for res in fscore_results
-                      ])
+    fscore_results = calculate_piotroski_f_score(annuals)
+
+    st.subheader("📘 Piotroski F-Score")
+    st.table([
+        {
+            'Year': res['Year'],
+            'F-Score': res['F-Score'],
+            'Criteria': ', '.join(['✔️' if c else '❌' for c in res['Criteria']])
+        } for res in fscore_results
+    ])
+
 
 
     except Exception as e:
