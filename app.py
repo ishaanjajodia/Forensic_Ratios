@@ -33,6 +33,7 @@ if ticker:
 
             st.header("Piotroski F-Score")
             fscore_results = calculate_piotroski_f_score(data)
+            st.write(fscore_results)
             for res in fscore_results:
                 st.subheader(f"📒 Year: {res['Year']} | F-Score: {res['F-Score']}/9")
                 for i, crit in enumerate(res['Criteria'], 1):
