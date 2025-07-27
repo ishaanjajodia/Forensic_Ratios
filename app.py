@@ -38,8 +38,8 @@ if ticker:
             st.subheader("🔍 Debug Output")
             st.write(fscore_results)
             for res in fscore_results:
-    st.write("🔎 Type of result:", type(res))
-    st.write("🔎 Value:", res)
+                 st.write("🔎 Type of result:", type(res))
+                 st.write("🔎 Value:", res)
 
     except Exception as e:
         st.error(f"❌ Error: {str(e)}")
