@@ -32,7 +32,7 @@ if ticker:
             st.table(beneish)
 
             
-            fscore_results = calculate_piotroski_f_score(annuals)
+            fscore_results = calculate_piotroski_f_score(data)
 
             st.subheader("📘 Piotroski F-Score")
             st.table([
