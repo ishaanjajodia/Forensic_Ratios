@@ -142,6 +142,7 @@ def calculate_beneish_m_score(data):
 import json
 def safe_div(a, b):
     return a / b if b else 0
+    
 def calculate_piotroski_score(data):
     try:
         annuals = [x for x in data['financials'] if x['Type'] == 'Annual']
