@@ -122,8 +122,17 @@ def calculate_beneish_m_score(data):
             4.679 * tata
         )
         results.append({
-            'Year': years[i],
-            'Beneish M-Score': round(m_score, 2)
-        })
+    'Year': years[i],
+    'DSRI': round(dsri, 3),
+    'GMI': round(gmi, 3),
+    'AQI': round(aqi, 3),
+    'SGI': round(sgi, 3),
+    'DEPI': round(depi, 3),
+    'SGAI': round(sgai, 3),
+    'LVGI': round(lvgi, 3),
+    'TATA': round(tata, 3),
+    'Beneish M-Score': round(m_score, 2)
+})
+
 
     return results
