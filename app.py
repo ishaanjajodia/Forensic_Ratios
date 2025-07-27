@@ -42,7 +42,7 @@ if ticker:
                {
                  'Year': res['Year'],
                  'F-Score': res['F-Score'],
-                 'Criteria': ', '.join(['✔️' if c else '❌' for c in res['Criteria']])
+                 'Criteria': ', '.join(['🟢' if c else '❌' for c in res['Criteria']])
                     } for res in fscore_results
                          ])
 
