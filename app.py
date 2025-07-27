@@ -38,10 +38,8 @@ if ticker:
             st.subheader("🔍 Debug Output")
             st.write(fscore_results)
             for res in fscore_results:
-                st.subheader(f"📒 Year: {res['Year']} | F-Score: {res['F-Score']}/9")
-                for i, crit in enumerate(res['Criteria'], 1):
-                    st.markdown(f"- Criterion {i}: {'✅ Yes' if crit else '❌ No'}")
-                st.markdown("")
+    st.write("🔎 Type of result:", type(res))
+    st.write("🔎 Value:", res)
 
     except Exception as e:
         st.error(f"❌ Error: {str(e)}")
