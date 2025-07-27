@@ -10,7 +10,7 @@ def calculate_sloan_ratios(data):
             total_assets = next((float(item['value']) for item in entry['stockFinancialMap']['BAL'] if item['key'] == 'TotalAssets'), None)
 
             if None not in (net_income, cfo, cfi, total_assets) and total_assets != 0:
-                sloan_ratio = (net_income - cfo - cfi) / total_assets
+                sloan_ratio = (net_income - cfo - cfi)*100 / total_assets
                 results.append({'Year': year, 'Sloan Ratio': round(sloan_ratio, 4)})
     return results
 
