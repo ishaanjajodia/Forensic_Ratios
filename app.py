@@ -1,26 +1,26 @@
 import streamlit as st
 from utils import fetch_data_from_indianapi
-from ratios import calculate_sloan_ratios, calculate_altman_z_scores, calculate_beneish_m_score
+from ratios import calculate_sloan_ratios, calculate_altman_z_scores, calculate_f_scores
 
-st.title("📊 Forensic Stock Analyzer")
+st.title("🔍 Forensic Stock Analyzer")
 
-ticker = st.text_input("Enter Ticker Symbol (e.g., INFY):")
+ticker = st.text_input("Enter Ticker Symbol (e.g., INFY, TCS, DISHMAN):")
 
 if ticker:
     try:
         data = fetch_data_from_indianapi(ticker)
 
-        st.header("Sloan Ratios")
+        st.subheader("📘 Sloan Ratios")
         sloan = calculate_sloan_ratios(data)
         st.table(sloan)
 
-        st.header("Altman Z-Score")
+        st.subheader("📊 Altman Z-Scores")
         altman = calculate_altman_z_scores(data)
         st.table(altman)
 
-        st.header("Beneish M-Score")
-        beneish = calculate_beneish_m_score(data)
-        st.table(beneish)
+        st.subheader("📈 Piotroski F-Scores")
+        fscore = calculate_f_scores(data)
+        st.table(fscore)
 
     except Exception as e:
-        st.error(str(e))
+        st.error(f"Error: {str(e)}")
