@@ -31,8 +31,11 @@ if ticker:
             st.subheader("📙 Beneish M-Score (Earnings Manipulation Risk)")
             st.table(beneish)
 
+            
             st.header("Piotroski F-Score")
             fscore_results = calculate_piotroski_f_score(data)
+            # 👇 DEBUG: show what it's returning
+            st.subheader("🔍 Debug Output")
             st.write(fscore_results)
             for res in fscore_results:
                 st.subheader(f"📒 Year: {res['Year']} | F-Score: {res['F-Score']}/9")
