@@ -139,3 +139,90 @@ def calculate_beneish_m_score(data):
 
     return results
 
+def safe_div(a, b):
+    return a / b if b else 0
+
+def calculate_piotroski_score(annuals):
+    annuals = sorted(annuals, key=lambda x: int(x['FiscalYear']))
+
+    years = []
+    net_income = []
+    cfo = []
+    total_assets = []
+    total_assets_beg = []
+    revenue = []
+    gross_profit = []
+    long_term_debt = []
+    current_assets = []
+    current_liabilities = []
+    shares_outstanding = []
+
+    for i, entry in enumerate(annuals):
+        years.append(entry['FiscalYear'])
+        inc = entry['stockFinancialMap']['INC']
+        net_income.append(float(next((v['value'] for v in inc if v['key'] == 'NetIncome'), 0)))
+        revenue.append(float(next((v['value'] for v in inc if v['key'] == 'TotalRevenue'), 0)))
+        gross_profit.append(float(next((v['value'] for v in inc if v['key'] == 'GrossProfit'), 0)))
+        cas = entry['stockFinancialMap']['CAS']
+        cfo.append(float(next((v['value'] for v in cas if v['key'] == 'CashfromOperatingActivities'), 0)))
+        bal = entry['stockFinancialMap']['BAL']
+        total_assets.append(float(next((v['value'] for v in bal if v['key'] == 'TotalAssets'), 0)))
+        long_term_debt.append(float(next((v['value'] for v in bal if v['key'] == 'LongTermDebt'), 0)))
+        current_assets.append(float(next((v['value'] for v in bal if v['key'] == 'TotalCurrentAssets'), 0)))
+        current_liabilities.append(float(next((v['value'] for v in bal if v['key'] == 'TotalCurrentLiabilities'), 0)))
+        shares_outstanding.append(float(next((v['value'] for v in bal if v['key'] == 'TotalCommonSharesOutstanding'), 0)))
+
+    total_assets_beg = [total_assets[0]] + total_assets[:-1]
+
+    results = []
+    for i in range(len(years)):
+        fscore = 0
+        criteria = []
+
+        roa = safe_div(net_income[i], total_assets_beg[i])
+        crit1 = roa > 0
+        fscore += int(crit1)
+        criteria.append(crit1)
+
+        cfroa = safe_div(cfo[i], total_assets_beg[i])
+        crit2 = cfroa > 0
+        fscore += int(crit2)
+        criteria.append(crit2)
+
+        crit3 = i > 0 and roa > safe_div(net_income[i-1], total_assets_beg[i-1])
+        fscore += int(crit3)
+        criteria.append(crit3)
+
+        crit4 = cfo[i] > net_income[i]
+        fscore += int(crit4)
+        criteria.append(crit4)
+
+        crit5 = i > 0 and safe_div(long_term_debt[i], total_assets[i]) < safe_div(long_term_debt[i-1], total_assets[i-1])
+        fscore += int(crit5)
+        criteria.append(crit5)
+
+        crit6 = i > 0 and safe_div(current_assets[i], current_liabilities[i]) > safe_div(current_assets[i-1], current_liabilities[i-1])
+        fscore += int(crit6)
+        criteria.append(crit6)
+
+        crit7 = i == 0 or shares_outstanding[i] <= shares_outstanding[i-1]
+        fscore += int(crit7)
+        criteria.append(crit7)
+
+        crit8 = i > 0 and safe_div(gross_profit[i], revenue[i]) > safe_div(gross_profit[i-1], revenue[i-1])
+        fscore += int(crit8)
+        criteria.append(crit8)
+
+        crit9 = i > 0 and safe_div(revenue[i], total_assets_beg[i]) > safe_div(revenue[i-1], total_assets_beg[i-1])
+        fscore += int(crit9)
+        criteria.append(crit9)
+
+        results.append({
+            'Year': years[i],
+            'Piotroski F-Score': fscore,
+            'Criteria': criteria
+        })
+
+    return results
+
+
