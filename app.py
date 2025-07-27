@@ -42,7 +42,20 @@ if ticker:
                {
                  'Year': res['Year'],
                  'F-Score': res['F-Score'],
-                 'Criteria': ', '.join(['🟢' if c else '❌' for c in res['Criteria']])
+                 'Criteria': '\n'.join([
+                        f"{i+1}. {name} — {'✔️' if flag else '❌'}"
+                        for i, (name, flag) in enumerate(zip([
+                                "ROA > 0",
+                                "CFO > 0",
+                                "ROA increased",
+                                "CFO > Net Income",
+                                "No new shares issued",
+                                "Current Ratio increased",
+                                "Gross Margin increased",
+                                "Asset Turnover increased",
+                               "Lower Leverage"
+                         ], res['Criteria']))
+                           ])
                     } for res in fscore_results
                          ])
 
