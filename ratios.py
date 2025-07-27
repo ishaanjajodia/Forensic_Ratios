@@ -149,33 +149,25 @@ def calculate_piotroski_f_score(annuals):
         return a / b if b else 0
 
     years = []
-    net_income = []
-    cfo = []
-    total_assets = []
-    total_assets_beg = []
-    revenue = []
-    gross_profit = []
-    long_term_debt = []
-    current_assets = []
-    current_liabilities = []
-    shares_outstanding = []
+    net_income, cfo, total_assets, revenue, gross_profit = [], [], [], [], []
+    long_term_debt, current_assets, current_liabilities, shares_outstanding = [], [], [], []
 
-    for i, entry in enumerate(annuals):
+    for entry in annuals:
         years.append(entry['FiscalYear'])
         inc = entry['stockFinancialMap']['INC']
+        cas = entry['stockFinancialMap']['CAS']
+        bal = entry['stockFinancialMap']['BAL']
+
         net_income.append(float(next((v['value'] for v in inc if v['key'] == 'NetIncome'), 0)))
         revenue.append(float(next((v['value'] for v in inc if v['key'] == 'TotalRevenue'), 0)))
         gross_profit.append(float(next((v['value'] for v in inc if v['key'] == 'GrossProfit'), 0)))
-        cas = entry['stockFinancialMap']['CAS']
         cfo.append(float(next((v['value'] for v in cas if v['key'] == 'CashfromOperatingActivities'), 0)))
-        bal = entry['stockFinancialMap']['BAL']
         total_assets.append(float(next((v['value'] for v in bal if v['key'] == 'TotalAssets'), 0)))
         long_term_debt.append(float(next((v['value'] for v in bal if v['key'] == 'LongTermDebt'), 0)))
         current_assets.append(float(next((v['value'] for v in bal if v['key'] == 'TotalCurrentAssets'), 0)))
         current_liabilities.append(float(next((v['value'] for v in bal if v['key'] == 'TotalCurrentLiabilities'), 0)))
         shares_outstanding.append(float(next((v['value'] for v in bal if v['key'] == 'TotalCommonSharesOutstanding'), 0)))
 
-    # Total assets beginning of year
     total_assets_beg = [total_assets[0]] + total_assets[:-1]
 
     results = []
@@ -183,86 +175,80 @@ def calculate_piotroski_f_score(annuals):
         fscore = 0
         criteria = []
 
-        # 1. ROA > 0
+        def label(flag, note=""):
+            return "Yes" if flag else ("No" if note == "" else note)
+
         roa = safe_div(net_income[i], total_assets_beg[i])
         crit1 = roa > 0
         fscore += int(crit1)
-        criteria.append(crit1)
+        criteria.append(f"1. ROA > 0: {label(crit1)}")
 
-        # 2. CFO > 0
         cfroa = safe_div(cfo[i], total_assets_beg[i])
         crit2 = cfroa > 0
         fscore += int(crit2)
-        criteria.append(crit2)
+        criteria.append(f"2. CFO > 0: {label(crit2)}")
 
-        # 3. ROA increase
         if i > 0:
             roa_prev = safe_div(net_income[i-1], total_assets_beg[i-1])
             crit3 = roa > roa_prev
+            criteria.append(f"3. ROA Increase: {label(crit3)}")
+            fscore += int(crit3)
         else:
-            crit3 = False
-        fscore += int(crit3)
-        criteria.append(crit3)
+            criteria.append("3. ROA Increase: N/A (No prior year)")
 
-        # 4. Accruals: CFO > Net Income
         crit4 = cfo[i] > net_income[i]
         fscore += int(crit4)
-        criteria.append(crit4)
+        criteria.append(f"4. CFO > Net Income: {label(crit4)}")
 
-        # 5. Leverage ↓
         if i > 0:
             avg_assets = (total_assets[i] + total_assets[i-1]) / 2
             avg_assets_prev = (total_assets[i-1] + total_assets[i-2]) / 2 if i > 1 else avg_assets
             gearing = safe_div(long_term_debt[i], avg_assets)
             gearing_prev = safe_div(long_term_debt[i-1], avg_assets_prev)
             crit5 = gearing < gearing_prev
+            fscore += int(crit5)
+            criteria.append(f"5. Leverage ↓: {label(crit5)}")
         else:
-            crit5 = False
-        fscore += int(crit5)
-        criteria.append(crit5)
+            criteria.append("5. Leverage ↓: N/A (No prior year)")
 
-        # 6. Current Ratio ↑
         if i > 0:
             curr_ratio = safe_div(current_assets[i], current_liabilities[i])
             curr_ratio_prev = safe_div(current_assets[i-1], current_liabilities[i-1])
             crit6 = curr_ratio > curr_ratio_prev
+            fscore += int(crit6)
+            criteria.append(f"6. Current Ratio ↑: {label(crit6)}")
         else:
-            crit6 = False
-        fscore += int(crit6)
-        criteria.append(crit6)
+            criteria.append("6. Current Ratio ↑: N/A (No prior year)")
 
-        # 7. No new shares
         if i > 0:
             crit7 = shares_outstanding[i] <= shares_outstanding[i-1]
+            criteria.append(f"7. No New Shares: {label(crit7)}")
+            fscore += int(crit7)
         else:
-            crit7 = True
-        fscore += int(crit7)
-        criteria.append(crit7)
+            criteria.append("7. No New Shares: N/A (No prior year)")
 
-        # 8. Gross Margin ↑
         if i > 0:
             gm = safe_div(gross_profit[i], revenue[i])
             gm_prev = safe_div(gross_profit[i-1], revenue[i-1])
             crit8 = gm > gm_prev
+            fscore += int(crit8)
+            criteria.append(f"8. Gross Margin ↑: {label(crit8)}")
         else:
-            crit8 = False
-        fscore += int(crit8)
-        criteria.append(crit8)
+            criteria.append("8. Gross Margin ↑: N/A (No prior year)")
 
-        # 9. Asset Turnover ↑
         if i > 0:
             at = safe_div(revenue[i], total_assets_beg[i])
             at_prev = safe_div(revenue[i-1], total_assets_beg[i-1])
             crit9 = at > at_prev
+            fscore += int(crit9)
+            criteria.append(f"9. Asset Turnover ↑: {label(crit9)}")
         else:
-            crit9 = False
-        fscore += int(crit9)
-        criteria.append(crit9)
+            criteria.append("9. Asset Turnover ↑: N/A (No prior year)")
 
         results.append({
             'Year': years[i],
             'F-Score': fscore,
-            'Criteria': criteria
+            'Details': criteria
         })
 
     return results
