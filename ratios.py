@@ -123,3 +123,8 @@ def calculate_beneish_m_score(data):
         )
         results.append({
             'Year': years[i],
+            'Beneish M-Score': round(m_score, 2),
+            'Flag': flag
+        })
+
+    return results
