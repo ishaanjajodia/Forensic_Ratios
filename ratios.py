@@ -65,13 +65,9 @@ def calculate_altman_z_scores(data):
 
 
 
-# ratios.py
-
 import json
-
 def safe_div(a, b):
     return a / b if b else 0
-
 def calculate_beneish_m_score(data):
     annuals = [x for x in data['financials'] if x['Type'] == 'Annual']
     annuals = sorted(annuals, key=lambda x: int(x['FiscalYear']))
@@ -143,91 +139,132 @@ def calculate_beneish_m_score(data):
 
 
 
+import json
+def safe_div(a, b):
+    return a / b if b else 0
 def calculate_piotroski_score(data):
-    import math
+    try:
+        annuals = [x for x in data['financials'] if x['Type'] == 'Annual']
+        annuals = sorted(annuals, key=lambda x: int(x['FiscalYear']))
 
-    def get_val(section, key):
-        return float(next((v['value'] for v in section if v['key'] == key), 0))
+        years = []
+        net_income = []
+        cfo = []
+        total_assets = []
+        total_assets_beg = []
+        revenue = []
+        gross_profit = []
+        long_term_debt = []
+        current_assets = []
+        current_liabilities = []
+        shares_outstanding = []
 
-    def safe_div(a, b):
-        return a / b if b else 0
+        for entry in annuals:
+            years.append(entry['FiscalYear'])
 
-    scores = []
+            inc = entry['stockFinancialMap']['INC']
+            net_income.append(float(next((v['value'] for v in inc if v['key'] == 'NetIncome'), 0)))
+            revenue.append(float(next((v['value'] for v in inc if v['key'] == 'TotalRevenue'), 0)))
+            gross_profit.append(float(next((v['value'] for v in inc if v['key'] == 'GrossProfit'), 0)))
 
-    financials = [entry for entry in data.get('financials', []) if entry.get('Type') == 'Annual']
-    financials.sort(key=lambda x: x.get('FiscalYear', 0))
+            cas = entry['stockFinancialMap']['CAS']
+            cfo.append(float(next((v['value'] for v in cas if v['key'] == 'CashfromOperatingActivities'), 0)))
 
-    for i in range(1, len(financials)):
-        curr = financials[i]
-        prev = financials[i - 1]
+            bal = entry['stockFinancialMap']['BAL']
+            total_assets.append(float(next((v['value'] for v in bal if v['key'] == 'TotalAssets'), 0)))
+            long_term_debt.append(float(next((v['value'] for v in bal if v['key'] == 'LongTermDebt'), 0)))
+            current_assets.append(float(next((v['value'] for v in bal if v['key'] == 'TotalCurrentAssets'), 0)))
+            current_liabilities.append(float(next((v['value'] for v in bal if v['key'] == 'TotalCurrentLiabilities'), 0)))
+            shares_outstanding.append(float(next((v['value'] for v in bal if v['key'] == 'TotalCommonSharesOutstanding'), 0)))
 
-        year = curr.get('FiscalYear', 'Unknown')
-        bal_c = curr['stockFinancialMap']['BAL']
-        inc_c = curr['stockFinancialMap']['INC']
-        cas_c = curr['stockFinancialMap']['CAS']
+        total_assets_beg = [total_assets[0]] + total_assets[:-1]
 
-        bal_p = prev['stockFinancialMap']['BAL']
-        inc_p = prev['stockFinancialMap']['INC']
-        cas_p = prev['stockFinancialMap']['CAS']
+        results = []
+        for i in range(len(years)):
+            fscore = 0
+            criteria = []
 
-        try:
-            # 1. Net Income > 0
-            ni = get_val(inc_c, 'NetIncome')
-            f1 = ni > 0
+            # Criterion 1: ROA > 0
+            roa = safe_div(net_income[i], total_assets_beg[i])
+            crit1 = roa > 0
+            fscore += int(crit1)
+            criteria.append(crit1)
 
-            # 2. Operating Cash Flow > 0
-            ocf = get_val(cas_c, 'CashFromOperatingActivities')
-            f2 = ocf > 0
+            # Criterion 2: CFO > 0
+            cfroa = safe_div(cfo[i], total_assets_beg[i])
+            crit2 = cfroa > 0
+            fscore += int(crit2)
+            criteria.append(crit2)
 
-            # 3. ROA (Return on Assets)
-            total_assets = get_val(bal_c, 'TotalAssets')
-            roa = safe_div(ni, total_assets)
-            prev_assets = get_val(bal_p, 'TotalAssets')
-            prev_ni = get_val(inc_p, 'NetIncome')
-            prev_roa = safe_div(prev_ni, prev_assets)
-            f3 = roa > prev_roa
+            # Criterion 3: ROA increasing
+            if i > 0:
+                roa_prev = safe_div(net_income[i-1], total_assets_beg[i-1])
+                crit3 = roa > roa_prev
+            else:
+                crit3 = False
+            fscore += int(crit3)
+            criteria.append(crit3)
 
-            # 4. OCF > NI
-            f4 = ocf > ni
+            # Criterion 4: CFO > Net Income
+            crit4 = cfo[i] > net_income[i]
+            fscore += int(crit4)
+            criteria.append(crit4)
 
-            # 5. Decrease in leverage
-            ltd_c = get_val(bal_c, 'LongTermDebt')
-            ltd_p = get_val(bal_p, 'LongTermDebt')
-            f5 = ltd_c < ltd_p
+            # Criterion 5: Leverage decreasing
+            if i > 0:
+                avg_assets = (total_assets[i] + total_assets[i-1]) / 2
+                avg_assets_prev = (total_assets[i-1] + total_assets[i-2]) / 2 if i > 1 else avg_assets
+                gearing = safe_div(long_term_debt[i], avg_assets)
+                gearing_prev = safe_div(long_term_debt[i-1], avg_assets_prev)
+                crit5 = gearing < gearing_prev
+            else:
+                crit5 = False
+            fscore += int(crit5)
+            criteria.append(crit5)
 
-            # 6. Current Ratio increases
-            cr_c = safe_div(get_val(bal_c, 'TotalCurrentAssets'), get_val(bal_c, 'TotalCurrentLiabilities'))
-            cr_p = safe_div(get_val(bal_p, 'TotalCurrentAssets'), get_val(bal_p, 'TotalCurrentLiabilities'))
-            f6 = cr_c > cr_p
+            # Criterion 6: Current ratio increasing
+            if i > 0:
+                curr_ratio = safe_div(current_assets[i], current_liabilities[i])
+                curr_ratio_prev = safe_div(current_assets[i-1], current_liabilities[i-1])
+                crit6 = curr_ratio > curr_ratio_prev
+            else:
+                crit6 = False
+            fscore += int(crit6)
+            criteria.append(crit6)
 
-            # 7. No dilution (Shares Outstanding not increasing)
-            so_c = get_val(bal_c, 'OrdinarySharesNumber')
-            so_p = get_val(bal_p, 'OrdinarySharesNumber')
-            f7 = so_c <= so_p
+            # Criterion 7: No dilution
+            if i > 0:
+                crit7 = shares_outstanding[i] <= shares_outstanding[i-1]
+            else:
+                crit7 = True
+            fscore += int(crit7)
+            criteria.append(crit7)
 
-            # 8. Gross Margin improves
-            gm_c = safe_div(get_val(inc_c, 'GrossProfit'), get_val(inc_c, 'TotalRevenue'))
-            gm_p = safe_div(get_val(inc_p, 'GrossProfit'), get_val(inc_p, 'TotalRevenue'))
-            f8 = gm_c > gm_p
+            # Criterion 8: Gross margin increasing
+            if i > 0:
+                gm = safe_div(gross_profit[i], revenue[i])
+                gm_prev = safe_div(gross_profit[i-1], revenue[i-1])
+                crit8 = gm > gm_prev
+            else:
+                crit8 = False
+            fscore += int(crit8)
+            criteria.append(crit8)
 
-            # 9. Asset Turnover improves
-            at_c = safe_div(get_val(inc_c, 'TotalRevenue'), total_assets)
-            at_p = safe_div(get_val(inc_p, 'TotalRevenue'), prev_assets)
-            f9 = at_c > at_p
+            # Criterion 9: Asset turnover increasing
+            if i > 0:
+                at = safe_div(revenue[i], total_assets_beg[i])
+                at_prev = safe_div(revenue[i-1], total_assets_beg[i-1])
+                crit9 = at > at_prev
+            else:
+                crit9 = False
+            fscore += int(crit9)
+            criteria.append(crit9)
 
-            score = sum([f1, f2, f3, f4, f5, f6, f7, f8, f9])
-            criteria = [f1, f2, f3, f4, f5, f6, f7, f8, f9]
+            results.append({
+                'Year': years[i],
+                'F-Score': fscore,
+                'Criteria': criteria
+            })
 
-        except Exception:
-            score = 0
-            criteria = ["Error"] * 9
-
-        scores.append({
-            'Year': year,
-            'F-Score': score,
-            'Criteria': criteria
-        })
-
-    return scores
-
+        return results
 
