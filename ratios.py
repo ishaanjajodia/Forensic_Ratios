@@ -269,82 +269,95 @@ def calculate_piotroski_f_score(annuals):
 
 
 def calculate_montier_c_score(data):
-    results = []
-    annuals = sorted([x for x in data['financials'] if x['Type'] == 'Annual'], key=lambda x: int(x['FiscalYear']))
-
     def safe_float(val):
         try:
             return float(val)
         except:
             return 0.0
 
-    def get_value(section, key, report):
-        return safe_float(next((item["value"] for item in report.get(section, []) if item["key"] == key), 0))
+    def get_value(section, key):
+        return safe_float(next((item["value"] for item in section if item["key"] == key), 0))
 
-    for i in range(1, len(annuals)):
-        year = annuals[i]['FiscalYear']
-        curr = annuals[i]
-        prev = annuals[i - 1]
+    # Filter and sort annual data
+    financials = [f for f in data['financials'] if f['Type'] == 'Annual']
+    financials.sort(key=lambda x: int(x['FiscalYear']))
 
-        flags = []
+    records = []
+    for entry in financials:
+        year = int(entry['FiscalYear'])
+        inc = entry['stockFinancialMap']['INC']
+        cas = entry['stockFinancialMap']['CAS']
+        bal = entry['stockFinancialMap']['BAL']
 
-        # 1. Growing difference in NI and CFO
-        ni = get_value("IncomeStatement", "NetIncome", curr)
-        cfo = get_value("CashFlow", "CashFromOperatingActivities", curr)
-        flags.append(ni > cfo)
-
-        # 2. Increasing DSO = AR growth > revenue growth
-        ar_curr = get_value("BalanceSheet", "AccountsReceivable", curr)
-        ar_prev = get_value("BalanceSheet", "AccountsReceivable", prev)
-        rev_curr = get_value("IncomeStatement", "TotalRevenue", curr)
-        rev_prev = get_value("IncomeStatement", "TotalRevenue", prev)
-        ar_growth = (ar_curr - ar_prev) / ar_prev if ar_prev else 0
-        rev_growth = (rev_curr - rev_prev) / rev_prev if rev_prev else 0
-        flags.append(ar_growth > rev_growth)
-
-        # 3. Inventory to Sales ratio increase
-        inv_curr = get_value("BalanceSheet", "Inventory", curr)
-        inv_prev = get_value("BalanceSheet", "Inventory", prev)
-        inv_sales_curr = inv_curr / rev_curr if rev_curr else 0
-        inv_sales_prev = inv_prev / rev_prev if rev_prev else 0
-        flags.append(inv_sales_curr > inv_sales_prev)
-
-        # 4. Capitalizing expenses — PPE growth > Revenue growth
-        ppe_curr = get_value("BalanceSheet", "NetPPE", curr)
-        ppe_prev = get_value("BalanceSheet", "NetPPE", prev)
-        ppe_growth = (ppe_curr - ppe_prev) / ppe_prev if ppe_prev else 0
-        flags.append(ppe_growth > rev_growth)
-
-        # 5. Declining Asset Quality = Current Assets / Total Assets falls
-        ca_curr = get_value("BalanceSheet", "TotalCurrentAssets", curr)
-        ca_prev = get_value("BalanceSheet", "TotalCurrentAssets", prev)
-        ta_curr = get_value("BalanceSheet", "TotalAssets", curr)
-        ta_prev = get_value("BalanceSheet", "TotalAssets", prev)
-        aq_curr = ca_curr / ta_curr if ta_curr else 0
-        aq_prev = ca_prev / ta_prev if ta_prev else 0
-        flags.append(aq_curr < aq_prev)
-
-        # 6. Frequent one-time gains = Other income increasing faster than Operating Income
-        other_curr = get_value("IncomeStatement", "OtherNet", curr)
-        other_prev = get_value("IncomeStatement", "OtherNet", prev)
-        op_curr = get_value("IncomeStatement", "OperatingIncome", curr)
-        op_prev = get_value("IncomeStatement", "OperatingIncome", prev)
-
-        other_growth = (other_curr - other_prev) / abs(other_prev) if other_prev else 0
-        op_growth = (op_curr - op_prev) / abs(op_prev) if op_prev else 0
-        flags.append(other_growth > op_growth)
-
-        results.append({
-            "Year": year,
-            "C-Score": sum(flags),
-            "Criteria": {
-                "Growing difference in NI and CFO": "✅" if flags[0] else "❌",
-                "Increasing DSOs (Receivables)": "✅" if flags[1] else "❌",
-                "Growing Inventory/Sales ratio": "✅" if flags[2] else "❌",
-                "Capitalizing expenses": "✅" if flags[3] else "❌",
-                "Declining Asset Quality": "✅" if flags[4] else "❌",
-                "Frequent one-time gains": "✅" if flags[5] else "❌"
-            }
+        records.append({
+            "year": year,
+            "net_income": get_value(inc, "NetIncome"),
+            "cash_from_operations": get_value(cas, "CashfromOperatingActivities"),
+            "receivables": get_value(bal, "AccountsReceivable-TradeNet"),
+            "revenue": get_value(inc, "TotalRevenue"),
+            "inventory": get_value(bal, "TotalInventory"),
+            "cost_of_goods_sold": get_value(inc, "CostofRevenueTotal"),
+            "other_current_assets": get_value(bal, "OtherCurrentAssetsTotal"),
+            "gross_ppe": get_value(bal, "Property/Plant/EquipmentTotal-Net"),
+            "depreciation": get_value(inc, "Depreciation/Amortization"),
+            "total_assets": get_value(bal, "TotalAssets"),
         })
+
+    results = []
+
+    for i in range(1, len(records)):
+        curr = records[i]
+        prev = records[i - 1]
+        score = 0
+        result = {"Year": curr["year"]}
+
+        # C1: NI/CFO increasing
+        ni_cfo_prev = safe_float(prev["net_income"]) / safe_float(prev["cash_from_operations"]) if prev["cash_from_operations"] else 0
+        ni_cfo_curr = safe_float(curr["net_income"]) / safe_float(curr["cash_from_operations"]) if curr["cash_from_operations"] else 0
+        crit1 = ni_cfo_curr > ni_cfo_prev
+        score += int(crit1)
+        result["C1: NI/CFO ↑"] = "🟢" if crit1 else "❌"
+
+        # C2: DSO ↑
+        dso_prev = safe_float(prev["receivables"]) / (safe_float(prev["revenue"]) / 365) if prev["revenue"] else 0
+        dso_curr = safe_float(curr["receivables"]) / (safe_float(curr["revenue"]) / 365) if curr["revenue"] else 0
+        crit2 = dso_curr > dso_prev
+        score += int(crit2)
+        result["C2: DSO ↑"] = "🟢" if crit2 else "❌"
+
+        # C3: DSI ↑
+        dsi_prev = safe_float(prev["inventory"]) / (safe_float(prev["cost_of_goods_sold"]) / 365) if prev["cost_of_goods_sold"] else 0
+        dsi_curr = safe_float(curr["inventory"]) / (safe_float(curr["cost_of_goods_sold"]) / 365) if curr["cost_of_goods_sold"] else 0
+        crit3 = dsi_curr > dsi_prev
+        score += int(crit3)
+        result["C3: DSI ↑"] = "🟢" if crit3 else "❌"
+
+        # C4: OCA/Revenue ↑
+        oca_rev_prev = safe_float(prev["other_current_assets"]) / safe_float(prev["revenue"]) if prev["revenue"] else 0
+        oca_rev_curr = safe_float(curr["other_current_assets"]) / safe_float(curr["revenue"]) if curr["revenue"] else 0
+        crit4 = oca_rev_curr > oca_rev_prev
+        score += int(crit4)
+        result["C4: OCA/Rev ↑"] = "🟢" if crit4 else "❌"
+
+        # C5: Dep/PPE ↓
+        dep_ppe_prev = safe_float(prev["depreciation"]) / safe_float(prev["gross_ppe"]) if prev["gross_ppe"] else 0
+        dep_ppe_curr = safe_float(curr["depreciation"]) / safe_float(curr["gross_ppe"]) if curr["gross_ppe"] else 0
+        crit5 = dep_ppe_curr < dep_ppe_prev
+        score += int(crit5)
+        result["C5: Dep/PPE ↓"] = "🟢" if crit5 else "❌"
+
+        # C6: Asset Growth > 10%
+        if i >= 3:
+            ta_now = safe_float(records[i]["total_assets"])
+            ta_3y_back = safe_float(records[i - 3]["total_assets"])
+            cagr = (ta_now / ta_3y_back) ** (1/3) - 1 if ta_3y_back else 0
+            crit6 = cagr > 0.10
+            score += int(crit6)
+            result["C6: Asset Growth >10%"] = "🟢" if crit6 else "❌"
+        else:
+            result["C6: Asset Growth >10%"] = "NA"
+
+        result["C-Score"] = f"{score}/6"
+        results.append(result)
 
     return results
