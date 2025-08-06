@@ -4,7 +4,8 @@ from ratios import (
     calculate_sloan_ratios,
     calculate_altman_z_scores,
     calculate_beneish_m_score,
-    calculate_piotroski_f_score
+    calculate_piotroski_f_score,
+    calculate_montier_c_score
 )
 
 st.title("📊 Forensic Stock Analyzer")
@@ -58,7 +59,27 @@ if ticker:
                            ])
                     } for res in fscore_results
                          ])
-
+# Montier C-Score
+            st.header("📒 Montier C-Score (Red Flags in Accounting)")
+            cscore_results = calculate_montier_c_score(data)
+            st.table([
+                {
+                    'Year': res['Year'],
+                    'C-Score': res['C-Score'],
+                    'Criteria': '\n'.join([
+                        f"{i+1}. {name} — {'🟢' if flag else '❌'}"
+                        for i, (name, flag) in enumerate(zip([
+                            "Growing difference in NI and CFO",
+                            "Increasing DSOs (Receivables)",
+                            "Growing Inventory/Sales ratio",
+                            "Capitalizing expenses",
+                            "Declining Asset Quality",
+                            "Frequent one-time gains"
+                        ], res['Criteria']))
+                    ])
+                }
+                for res in cscore_results
+            ])
 
 
     except Exception as e:
