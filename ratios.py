@@ -286,61 +286,65 @@ def calculate_montier_c_score(data):
         curr = annuals[i]
         prev = annuals[i - 1]
 
-        criteria = []
+        flags = []
 
-        # 1. Net Income > CFO
+        # 1. Growing difference in NI and CFO
         ni = get_value("IncomeStatement", "NetIncome", curr)
         cfo = get_value("CashFlow", "CashFromOperatingActivities", curr)
-        criteria.append(ni > cfo)
+        flags.append(ni > cfo)
 
-        # 2. Increase in receivables > increase in sales
+        # 2. Increasing DSO = AR growth > revenue growth
         ar_curr = get_value("BalanceSheet", "AccountsReceivable", curr)
         ar_prev = get_value("BalanceSheet", "AccountsReceivable", prev)
         rev_curr = get_value("IncomeStatement", "TotalRevenue", curr)
         rev_prev = get_value("IncomeStatement", "TotalRevenue", prev)
         ar_growth = (ar_curr - ar_prev) / ar_prev if ar_prev else 0
         rev_growth = (rev_curr - rev_prev) / rev_prev if rev_prev else 0
-        criteria.append(ar_growth > rev_growth)
+        flags.append(ar_growth > rev_growth)
 
-        # 3. Deteriorating gross margin
-        gp_curr = get_value("IncomeStatement", "GrossProfit", curr)
-        gp_prev = get_value("IncomeStatement", "GrossProfit", prev)
-        gm_curr = gp_curr / rev_curr if rev_curr else 0
-        gm_prev = gp_prev / rev_prev if rev_prev else 0
-        criteria.append(gm_curr < gm_prev)
+        # 3. Inventory to Sales ratio increase
+        inv_curr = get_value("BalanceSheet", "Inventory", curr)
+        inv_prev = get_value("BalanceSheet", "Inventory", prev)
+        inv_sales_curr = inv_curr / rev_curr if rev_curr else 0
+        inv_sales_prev = inv_prev / rev_prev if rev_prev else 0
+        flags.append(inv_sales_curr > inv_sales_prev)
 
-        # 4. Deteriorating asset quality
+        # 4. Capitalizing expenses — PPE growth > Revenue growth
+        ppe_curr = get_value("BalanceSheet", "NetPPE", curr)
+        ppe_prev = get_value("BalanceSheet", "NetPPE", prev)
+        ppe_growth = (ppe_curr - ppe_prev) / ppe_prev if ppe_prev else 0
+        flags.append(ppe_growth > rev_growth)
+
+        # 5. Declining Asset Quality = Current Assets / Total Assets falls
         ca_curr = get_value("BalanceSheet", "TotalCurrentAssets", curr)
-        cl_curr = get_value("BalanceSheet", "TotalCurrentLiabilities", curr)
-        aq_curr = cl_curr / ca_curr if ca_curr else 0
-
         ca_prev = get_value("BalanceSheet", "TotalCurrentAssets", prev)
-        cl_prev = get_value("BalanceSheet", "TotalCurrentLiabilities", prev)
-        aq_prev = cl_prev / ca_prev if ca_prev else 0
-        criteria.append(aq_curr > aq_prev)
-
-        # 5. Increasing sales with decreasing ROA
         ta_curr = get_value("BalanceSheet", "TotalAssets", curr)
         ta_prev = get_value("BalanceSheet", "TotalAssets", prev)
-        roa_curr = ni / ta_curr if ta_curr else 0
-        ni_prev = get_value("IncomeStatement", "NetIncome", prev)
-        roa_prev = ni_prev / ta_prev if ta_prev else 0
-        criteria.append((rev_curr > rev_prev) and (roa_curr < roa_prev))
+        aq_curr = ca_curr / ta_curr if ta_curr else 0
+        aq_prev = ca_prev / ta_prev if ta_prev else 0
+        flags.append(aq_curr < aq_prev)
 
-        # 6. High accruals (Net Income - CFO) / Total Assets
-        accrual = (ni - cfo) / ta_curr if ta_curr else 0
-        criteria.append(accrual > 0.1)
+        # 6. Frequent one-time gains = Other income increasing faster than Operating Income
+        other_curr = get_value("IncomeStatement", "OtherNet", curr)
+        other_prev = get_value("IncomeStatement", "OtherNet", prev)
+        op_curr = get_value("IncomeStatement", "OperatingIncome", curr)
+        op_prev = get_value("IncomeStatement", "OperatingIncome", prev)
 
-        # 7. Increasing leverage
-        tl_curr = get_value("BalanceSheet", "TotalLiabilities", curr)
-        tl_prev = get_value("BalanceSheet", "TotalLiabilities", prev)
-        criteria.append(tl_curr > tl_prev)
+        other_growth = (other_curr - other_prev) / abs(other_prev) if other_prev else 0
+        op_growth = (op_curr - op_prev) / abs(op_prev) if op_prev else 0
+        flags.append(other_growth > op_growth)
 
         results.append({
             "Year": year,
-            "C-Score": sum(criteria),
-            "Criteria": criteria
+            "C-Score": sum(flags),
+            "Criteria": {
+                "Growing difference in NI and CFO": "✅" if flags[0] else "❌",
+                "Increasing DSOs (Receivables)": "✅" if flags[1] else "❌",
+                "Growing Inventory/Sales ratio": "✅" if flags[2] else "❌",
+                "Capitalizing expenses": "✅" if flags[3] else "❌",
+                "Declining Asset Quality": "✅" if flags[4] else "❌",
+                "Frequent one-time gains": "✅" if flags[5] else "❌"
+            }
         })
 
     return results
-
