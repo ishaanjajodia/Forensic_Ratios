@@ -59,27 +59,10 @@ if ticker:
                            ])
                     } for res in fscore_results
                          ])
-# Montier C-Score
-            st.header("📒 Montier C-Score (Red Flags in Accounting)")
-            cscore_results = calculate_montier_c_score(data)
-            st.table([
-                {
-                    'Year': res['Year'],
-                    'C-Score': res['C-Score'],
-                    'Criteria': '\n'.join([
-                        f"{i+1}. {name} — {'🟢' if flag else '❌'}"
-                        for i, (name, flag) in enumerate(zip([
-                            "Growing difference in NI and CFO",
-                            "Increasing DSOs (Receivables)",
-                            "Growing Inventory/Sales ratio",
-                            "Capitalizing expenses",
-                            "Declining Asset Quality",
-                            "Frequent one-time gains"
-                        ], res['Criteria']))
-                    ])
-                }
-                for res in cscore_results
-            ])
+            st.header("Montier C-Score")
+            montier = calculate_montier_c_score(data)
+            st.subheader("📕 Montier C-Score (Red Flags Detection)")
+            st.table(montier)
 
 
     except Exception as e:
