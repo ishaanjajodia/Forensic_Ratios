@@ -266,3 +266,73 @@ def calculate_piotroski_f_score(annuals):
         })
 
     return results
+
+
+def calculate_montier_c_score(data):
+    results = []
+    annuals = sorted([x for x in data['financials'] if x['Type'] == 'Annual'], key=lambda x: int(x['FiscalYear']))
+
+    for i in range(1, len(annuals)):
+        year = annuals[i]['FiscalYear']
+        curr = annuals[i]
+        prev = annuals[i - 1]
+
+        def gv(section, key, report):
+            return get_value(report[section], key)
+
+        criteria = []
+
+        # 1. Net Income > CFO
+        ni = gv("IncomeStatement", "NetIncome", curr)
+        cfo = gv("CashFlow", "CashFromOperatingActivities", curr)
+        criteria.append(ni > cfo)
+
+        # 2. Increase in receivables > increase in sales
+        ar_curr = gv("BalanceSheet", "AccountsReceivable", curr)
+        ar_prev = gv("BalanceSheet", "AccountsReceivable", prev)
+        rev_curr = gv("IncomeStatement", "TotalRevenue", curr)
+        rev_prev = gv("IncomeStatement", "TotalRevenue", prev)
+        ar_growth = (ar_curr - ar_prev) / ar_prev if ar_prev != 0 else 0
+        rev_growth = (rev_curr - rev_prev) / rev_prev if rev_prev != 0 else 0
+        criteria.append(ar_growth > rev_growth)
+
+        # 3. Deteriorating gross margin
+        gp_curr = gv("IncomeStatement", "GrossProfit", curr)
+        gp_prev = gv("IncomeStatement", "GrossProfit", prev)
+        gm_curr = gp_curr / rev_curr if rev_curr != 0 else 0
+        gm_prev = gp_prev / rev_prev if rev_prev != 0 else 0
+        criteria.append(gm_curr < gm_prev)
+
+        # 4. Deteriorating asset quality
+        ca_curr = gv("BalanceSheet", "TotalCurrentAssets", curr)
+        cl_curr = gv("BalanceSheet", "TotalCurrentLiabilities", curr)
+        asset_quality = cl_curr / ca_curr if ca_curr != 0 else 0
+        ca_prev = gv("BalanceSheet", "TotalCurrentAssets", prev)
+        cl_prev = gv("BalanceSheet", "TotalCurrentLiabilities", prev)
+        asset_quality_prev = cl_prev / ca_prev if ca_prev != 0 else 0
+        criteria.append(asset_quality > asset_quality_prev)
+
+        # 5. Increasing sales with decreasing ROA
+        roa_curr = ni / gv("BalanceSheet", "TotalAssets", curr) if gv("BalanceSheet", "TotalAssets", curr) != 0 else 0
+        ni_prev = gv("IncomeStatement", "NetIncome", prev)
+        roa_prev = ni_prev / gv("BalanceSheet", "TotalAssets", prev) if gv("BalanceSheet", "TotalAssets", prev) != 0 else 0
+        criteria.append((rev_curr > rev_prev) and (roa_curr < roa_prev))
+
+        # 6. High accruals (Net Income - CFO) / Total Assets
+        ta = gv("BalanceSheet", "TotalAssets", curr)
+        accrual = (ni - cfo) / ta if ta != 0 else 0
+        criteria.append(accrual > 0.1)
+
+        # 7. Increasing leverage
+        tl_curr = gv("BalanceSheet", "TotalLiabilities", curr)
+        tl_prev = gv("BalanceSheet", "TotalLiabilities", prev)
+        criteria.append(tl_curr > tl_prev)
+
+        results.append({
+            "Year": year,
+            "C-Score": sum(criteria),
+            "Criteria": criteria
+        })
+
+    return results
+
