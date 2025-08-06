@@ -8,7 +8,7 @@ from ratios import (
     calculate_montier_c_score
 )
 
-st.title("📊 Forensic Stock Analyzer")
+st.title("📊 Forensic Stock")
 
 ticker = st.text_input("Enter Ticker Symbol (e.g., INFY):").upper()
 
